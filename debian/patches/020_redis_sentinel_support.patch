@@ -1,0 +1,239 @@
+diff --git a/cmd/cgr-engine/cgr-engine.go b/cmd/cgr-engine/cgr-engine.go
+index c44a33720..28f26874f 100644
+--- a/cmd/cgr-engine/cgr-engine.go
++++ b/cmd/cgr-engine/cgr-engine.go
+@@ -802,7 +802,7 @@ func main() {
+ 	if cfg.RALsEnabled || cfg.CDRStatsEnabled || cfg.PubSubServerEnabled ||
+ 		cfg.AliasesServerEnabled || cfg.UserServerEnabled || cfg.SchedulerEnabled {
+ 		dm, err = engine.ConfigureDataStorage(cfg.DataDbType, cfg.DataDbHost, cfg.DataDbPort,
+-			cfg.DataDbName, cfg.DataDbUser, cfg.DataDbPass, cfg.DBDataEncoding, cfg.CacheCfg(), cfg.LoadHistorySize)
++			cfg.DataDbName, cfg.DataDbUser, cfg.DataDbPass, cfg.DBDataEncoding, cfg.CacheCfg(), cfg.LoadHistorySize, cfg.DataDbSentinelName)
+ 		if err != nil { // Cannot configure getter database, show stopper
+ 			utils.Logger.Crit(fmt.Sprintf("Could not configure dataDb: %s exiting!", err))
+ 			return
+diff --git a/cmd/cgr-loader/cgr-loader.go b/cmd/cgr-loader/cgr-loader.go
+index 339fe50cc..fe54d6b75 100755
+--- a/cmd/cgr-loader/cgr-loader.go
++++ b/cmd/cgr-loader/cgr-loader.go
+@@ -48,6 +48,8 @@ var (
+ 	stor_db_pass = flag.String("stordb_passwd", "ironsecret", "The storDb user's password.")
+ 
+ 	dbdata_encoding = flag.String("dbdata_encoding", config.CgrConfig().DBDataEncoding, "The encoding used to store object data in strings")
++	dbRedisSentinel = flag.String("redis_sentinel", config.CgrConfig().DataDbSentinelName,
++		"The name of redis sentinel")
+ 
+ 	flush           = flag.Bool("flushdb", false, "Flush the database before importing")
+ 	tpid            = flag.String("tpid", "", "The tariff plan id from the database")
+@@ -99,7 +101,7 @@ func main() {
+ 
+ 	if !*toStorDb {
+ 		dm, errDataDB = engine.ConfigureDataStorage(*datadb_type, *datadb_host, *datadb_port, *datadb_name,
+-			*datadb_user, *datadb_pass, *dbdata_encoding, config.CgrConfig().CacheCfg(), *loadHistorySize)
++			*datadb_user, *datadb_pass, *dbdata_encoding, config.CgrConfig().CacheCfg(), *loadHistorySize, *dbRedisSentinel)
+ 	}
+ 	if *fromStorDb || *toStorDb {
+ 		storDb, errStorDb = engine.ConfigureLoadStorage(*stor_db_type, *stor_db_host, *stor_db_port, *stor_db_name, *stor_db_user, *stor_db_pass, *dbdata_encoding,
+diff --git a/cmd/cgr-tester/cgr-tester.go b/cmd/cgr-tester/cgr-tester.go
+index 23a8a1d2a..c5bf9fe41 100644
+--- a/cmd/cgr-tester/cgr-tester.go
++++ b/cmd/cgr-tester/cgr-tester.go
+@@ -47,6 +47,7 @@ var (
+ 	datadb_user     = flag.String("datadb_user", cgrConfig.DataDbUser, "The DataDb user to sign in as.")
+ 	datadb_pass     = flag.String("datadb_pass", cgrConfig.DataDbPass, "The DataDb user's password.")
+ 	dbdata_encoding = flag.String("dbdata_encoding", cgrConfig.DBDataEncoding, "The encoding used to store object data in strings.")
++	dbRedisSentinel  = flag.String("redis_sentinel", cgrConfig.DataDbSentinelName, "The name of redis sentinel")
+ 	raterAddress    = flag.String("rater_address", "trunks.ivozprovider.local:2012", "Rater address for remote tests. Empty for internal rater.")
+ 	tor             = flag.String("tor", utils.VOICE, "The type of record to use in queries.")
+ 	category        = flag.String("category", "call", "The Record category to test.")
+@@ -62,7 +63,7 @@ var (
+ 
+ func durInternalRater(cd *engine.CallDescriptor) (time.Duration, error) {
+ 	dm, err := engine.ConfigureDataStorage(*datadb_type, *datadb_host, *datadb_port,
+-		*datadb_name, *datadb_user, *datadb_pass, *dbdata_encoding, cgrConfig.CacheCfg(), *loadHistorySize)
++		*datadb_name, *datadb_user, *datadb_pass, *dbdata_encoding, cgrConfig.CacheCfg(), *loadHistorySize, *dbRedisSentinel)
+ 	if err != nil {
+ 		return nilDuration, fmt.Errorf("Could not connect to data database: %s", err.Error())
+ 	}
+diff --git a/config/config.go b/config/config.go
+index 89e9d4816..c7e1476e2 100755
+--- a/config/config.go
++++ b/config/config.go
+@@ -255,6 +255,7 @@ type CGRConfig struct {
+ 	DataDbName               string // The name of the database to connect to.
+ 	DataDbUser               string // The user to sign in as.
+ 	DataDbPass               string // The user's password.
++	DataDbSentinelName       string
+ 	LoadHistorySize          int    // Maximum number of records to archive in load history
+ 	StorDBType               string // Should reflect the database type used to store logs
+ 	StorDBHost               string // The host to connect to. Values that start with / are for UNIX domain sockets.
+@@ -807,6 +808,9 @@ func (self *CGRConfig) loadFromJsonCfg(jsnCfg *CgrJsonCfg) (err error) {
+ 		if jsnDataDbCfg.Load_history_size != nil {
+ 			self.LoadHistorySize = *jsnDataDbCfg.Load_history_size
+ 		}
++		if jsnDataDbCfg.Redis_sentinel != nil {
++			self.DataDbSentinelName = *jsnDataDbCfg.Redis_sentinel
++		}
+ 	}
+ 
+ 	if jsnStorDbCfg != nil {
+diff --git a/config/config_defaults.go b/config/config_defaults.go
+index 03f552651..33a5eef19 100755
+--- a/config/config_defaults.go
++++ b/config/config_defaults.go
+@@ -59,6 +59,7 @@ const CGRATES_CFG_JSON = `
+ 	"db_user": "cgrates", 					// username to use when connecting to data_db
+ 	"db_password": "", 						// password to use when connecting to data_db
+ 	"load_history_size": 10,				// Number of records in the load history
++	"redis_sentinel":"",					// redis_sentinel is the name of sentinel
+ },
+ 
+ 
+diff --git a/config/libconfig_json.go b/config/libconfig_json.go
+index 89e5b2cb5..cfb4ec3ec 100755
+--- a/config/libconfig_json.go
++++ b/config/libconfig_json.go
+@@ -70,6 +70,7 @@ type DbJsonCfg struct {
+ 	Conn_max_lifetime *int // Used only in case of storDb
+ 	Load_history_size *int // Used in case of dataDb to limit the length of the loads history
+ 	Cdrs_indexes      *[]string
++	Redis_sentinel    *string
+ }
+ 
+ // Filters config
+diff --git a/engine/calldesc.go b/engine/calldesc.go
+index 80cb5f1be..c1ad3cc17 100755
+--- a/engine/calldesc.go
++++ b/engine/calldesc.go
+@@ -58,7 +58,7 @@ func init() {
+ 			log.Fatal(err)
+ 		}
+ 	case utils.REDIS:
+-		data, _ = NewRedisStorage("127.0.0.1:6379", 12, "", utils.MSGPACK, utils.REDIS_MAX_CONNS, config.CacheConfig{utils.CacheRatingPlans: &config.CacheParamConfig{Precache: true}}, 10)
++		data, _ = NewRedisStorage("127.0.0.1:6379", 12, "", utils.MSGPACK, utils.REDIS_MAX_CONNS, config.CacheConfig{utils.CacheRatingPlans: &config.CacheParamConfig{Precache: true}}, 10, "")
+ 		if err != nil {
+ 			log.Fatal(err)
+ 		}
+diff --git a/engine/libtest.go b/engine/libtest.go
+index a73d5a09e..b9265f141 100644
+--- a/engine/libtest.go
++++ b/engine/libtest.go
+@@ -35,7 +35,7 @@ import (
+ 
+ func InitDataDb(cfg *config.CGRConfig) error {
+ 	dm, err := ConfigureDataStorage(cfg.DataDbType, cfg.DataDbHost, cfg.DataDbPort, cfg.DataDbName,
+-		cfg.DataDbUser, cfg.DataDbPass, cfg.DBDataEncoding, cfg.CacheCfg(), cfg.LoadHistorySize)
++		cfg.DataDbUser, cfg.DataDbPass, cfg.DBDataEncoding, cfg.CacheCfg(), cfg.LoadHistorySize, cfg.DataDbSentinelName)
+ 	if err != nil {
+ 		return err
+ 	}
+diff --git a/engine/storage_redis.go b/engine/storage_redis.go
+index 59776ad0f..15557ce8d 100755
+--- a/engine/storage_redis.go
++++ b/engine/storage_redis.go
+@@ -32,6 +32,7 @@ import (
+ 	"github.com/cgrates/cgrates/utils"
+ 	"github.com/mediocregopher/radix.v2/pool"
+ 	"github.com/mediocregopher/radix.v2/redis"
++	"github.com/mediocregopher/radix.v2/sentinel"
+ )
+ 
+ type RedisStorage struct {
+@@ -40,9 +41,11 @@ type RedisStorage struct {
+ 	ms              Marshaler
+ 	cacheCfg        config.CacheConfig
+ 	loadHistorySize int
++	sentinelClient *sentinel.Client
++	sentinelName   string
+ }
+ 
+-func NewRedisStorage(address string, db int, pass, mrshlerStr string, maxConns int, cacheCfg config.CacheConfig, loadHistorySize int) (*RedisStorage, error) {
++func NewRedisStorage(address string, db int, pass, mrshlerStr string, maxConns int, cacheCfg config.CacheConfig, loadHistorySize int, sentinelName string) (*RedisStorage, error) {
+ 	df := func(network, addr string) (*redis.Client, error) {
+ 		client, err := redis.Dial(network, addr)
+ 		if err != nil {
+@@ -62,10 +65,6 @@ func NewRedisStorage(address string, db int, pass, mrshlerStr string, maxConns i
+ 		}
+ 		return client, nil
+ 	}
+-	p, err := pool.NewCustom("tcp", address, maxConns, df)
+-	if err != nil {
+-		return nil, err
+-	}
+ 	var mrshler Marshaler
+ 	if mrshlerStr == utils.MSGPACK {
+ 		mrshler = NewCodecMsgpackMarshaler()
+@@ -74,13 +73,38 @@ func NewRedisStorage(address string, db int, pass, mrshlerStr string, maxConns i
+ 	} else {
+ 		return nil, fmt.Errorf("Unsupported marshaler: %v", mrshlerStr)
+ 	}
+-	return &RedisStorage{dbPool: p, maxConns: maxConns, ms: mrshler,
+-		cacheCfg: cacheCfg, loadHistorySize: loadHistorySize}, nil
++
++	if sentinelName != "" {
++		client, err := sentinel.NewClientCustom("tcp", address, maxConns, df, sentinelName)
++		if err != nil {
++			return nil, err
++		}
++		return &RedisStorage{maxConns: maxConns, ms: mrshler,
++			cacheCfg: cacheCfg, sentinelClient: client,
++			sentinelName: sentinelName}, nil
++	} else {
++		p, err := pool.NewCustom("tcp", address, maxConns, df)
++		if err != nil {
++			return nil, err
++		}
++		return &RedisStorage{dbPool: p, maxConns: maxConns,
++			ms: mrshler, cacheCfg: cacheCfg, loadHistorySize: loadHistorySize}, nil
++	}
+ }
+ 
+ // This CMD function get a connection from the pool.
+ // Handles automatic failover in case of network disconnects
+ func (rs *RedisStorage) Cmd(cmd string, args ...interface{}) *redis.Resp {
++	if rs.sentinelName != "" {
++		conn, err := rs.sentinelClient.GetMaster(rs.sentinelName)
++		if err != nil {
++			return redis.NewResp(err)
++		}
++		result := conn.Cmd(cmd, args...)
++		rs.sentinelClient.PutMaster(rs.sentinelName, conn)
++		return result
++	}
++
+ 	c1, err := rs.dbPool.Get()
+ 	if err != nil {
+ 		return redis.NewResp(err)
+diff --git a/engine/storage_utils.go b/engine/storage_utils.go
+index ef411d85d..a42de8b46 100755
+--- a/engine/storage_utils.go
++++ b/engine/storage_utils.go
+@@ -30,7 +30,7 @@ import (
+ 
+ // Various helpers to deal with database
+ 
+-func ConfigureDataStorage(db_type, host, port, name, user, pass, marshaler string, cacheCfg config.CacheConfig, loadHistorySize int) (dm *DataManager, err error) {
++func ConfigureDataStorage(db_type, host, port, name, user, pass, marshaler string, cacheCfg config.CacheConfig, loadHistorySize int, sentinelName string) (dm *DataManager, err error) {
+ 	var d DataDB
+ 	switch db_type {
+ 	case utils.REDIS:
+@@ -43,7 +43,7 @@ func ConfigureDataStorage(db_type, host, port, name, user, pass, marshaler strin
+ 		if port != "" {
+ 			host += ":" + port
+ 		}
+-		d, err = NewRedisStorage(host, db_nb, pass, marshaler, utils.REDIS_MAX_CONNS, cacheCfg, loadHistorySize)
++		d, err = NewRedisStorage(host, db_nb, pass, marshaler, utils.REDIS_MAX_CONNS, cacheCfg, loadHistorySize, sentinelName)
+ 		dm = NewDataManager(d.(DataDB))
+ 	case utils.MONGO:
+ 		d, err = NewMongoStorage(host, port, name, user, pass, utils.DataDB, nil, cacheCfg, loadHistorySize)
+diff --git a/glide.yaml b/glide.yaml
+index 84a744030..a22fcb5e6 100644
+--- a/glide.yaml
++++ b/glide.yaml
+@@ -23,6 +23,7 @@ import:
+   subpackages:
+   - pool
+   - redis
++  - sentinel
+ - package: github.com/peterh/liner
+ - package: github.com/ugorji/go
+   subpackages:
