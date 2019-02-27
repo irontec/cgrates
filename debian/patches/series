@@ -17,3 +17,4 @@
 017_skip_incomplete_lcr_rules.patch
 018_rerating_prepaid_calls.patch
 019_use_parsetimedectlayout.patch
+020_redis_sentinel_support.patch
