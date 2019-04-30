@@ -1,0 +1,15 @@
+diff --git a/engine/storage_redis.go b/engine/storage_redis.go
+index 15557ce8d..7c5ca6678 100755
+--- a/engine/storage_redis.go
++++ b/engine/storage_redis.go
+@@ -128,7 +194,9 @@ func (rs *RedisStorage) Cmd(cmd string, args ...interface{}) *redis.Resp {
+ }
+ 
+ func (rs *RedisStorage) Close() {
+-	rs.dbPool.Empty()
++	if rs.dbPool != nil {
++		rs.dbPool.Empty()
++	}
+ }
+ 
+ func (rs *RedisStorage) Flush(ignore string) error {

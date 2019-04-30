@@ -19,3 +19,4 @@
 019_use_parsetimedectlayout.patch
 020_redis_sentinel_support.patch
 021_skip_tp_versions.patch
+022_close_datadb.patch
