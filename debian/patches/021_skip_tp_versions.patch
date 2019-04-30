@@ -1,0 +1,15 @@
+diff --git a/cmd/cgr-engine/cgr-engine.go b/cmd/cgr-engine/cgr-engine.go
+index 28f26874f..b1171de31 100644
+--- a/cmd/cgr-engine/cgr-engine.go
++++ b/cmd/cgr-engine/cgr-engine.go
+@@ -809,10 +809,6 @@ func main() {
+ 		}
+ 		defer dm.DataDB().Close()
+ 		engine.SetDataStorage(dm)
+-		if err := engine.CheckVersions(dm.DataDB()); err != nil {
+-			fmt.Println(err.Error())
+-			return
+-		}
+ 	}
+ 	if cfg.RALsEnabled || cfg.CDRSEnabled || cfg.SchedulerEnabled { // Only connect to storDb if necessary
+ 		storDb, err := engine.ConfigureStorStorage(cfg.StorDBType, cfg.StorDBHost, cfg.StorDBPort,
