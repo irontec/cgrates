@@ -22,3 +22,4 @@
 022_close_datadb.patch
 #023_sentinel_failover.patch
 024_sentinel_reconnect.patch
+025_derived_chargers.patch
