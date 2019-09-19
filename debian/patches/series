@@ -21,3 +21,4 @@
 021_skip_tp_versions.patch
 022_close_datadb.patch
 #023_sentinel_failover.patch
+024_sentinel_reconnect.patch
