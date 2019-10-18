@@ -1,0 +1,169 @@
+commit 489d0d2807b8a8a0814dd7ddac074143c5c9b9af
+Author: ccruz <carlos@irontec.com>
+Date:   Thu Oct 17 19:50:02 2019 +0200
+
+    clean up removes both redis and cache to avoid flushing cache
+
+diff --git a/apier/v1/apier.go b/apier/v1/apier.go
+index ec6dee001..092c87c9f 100644
+--- a/apier/v1/apier.go
++++ b/apier/v1/apier.go
+@@ -350,12 +350,12 @@ func (self *ApierV1) LoadTariffPlanFromStorDb(attrs AttrLoadTpFromStorDb, reply
+ 		return utils.NewErrServerError(err)
+ 	}
+ 	if attrs.Validate {
++		utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, validate loaded data")
+ 		if !dbReader.IsValid() {
+ 			err := errors.New("ApierV1.LoadTariffPlanFromStorDb, validation ended with errors")
+ 			utils.Logger.Err(err.Error())
+ 			return err
+ 		}
+-		utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, validation ended successfully")
+ 	}
+ 	if attrs.DryRun {
+ 		*reply = OK
+@@ -363,14 +363,14 @@ func (self *ApierV1) LoadTariffPlanFromStorDb(attrs AttrLoadTpFromStorDb, reply
+ 	}
+ 
+ 	if attrs.Cleanup {
++		utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, clean up unused rating plans and rating profiles")
+ 		if err := dbReader.CleanDataDb(attrs.TPid); err != nil {
+ 			utils.Logger.Err(err.Error())
+ 			return err
+ 		}
+-		utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, cleanup ended succesfully")
+-		attrs.FlushDb = true // Cleanup requires flushing cache
+ 	}
+ 
++	utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, write data to Redis")
+ 	if err := dbReader.WriteToDatabase(attrs.FlushDb, false, false); err != nil {
+ 		utils.Logger.Err(err.Error())
+ 		return utils.NewErrServerError(err)
+diff --git a/cmd/cgr-loader/cgr-loader.go b/cmd/cgr-loader/cgr-loader.go
+index fe54d6b75..c7074fd6b 100755
+--- a/cmd/cgr-loader/cgr-loader.go
++++ b/cmd/cgr-loader/cgr-loader.go
+@@ -178,6 +178,7 @@ func main() {
+ 	}
+ 
+ 	tpReader := engine.NewTpReader(dm.DataDB(), loader, *tpid, *timezone)
++	log.Printf("Load all data from database for %q\n", *tpid)
+ 	err = tpReader.LoadAll()
+ 	if err != nil {
+ 		log.Fatal(err)
+@@ -186,22 +187,19 @@ func main() {
+ 		tpReader.ShowStatistics()
+ 	}
+ 	if *validate {
++		log.Println("Validate loaded data")
+ 		if !tpReader.IsValid() {
+ 			return
+-		} else {
+-			log.Println("Validation ended successfully")
+ 		}
+ 	}
+ 	if *dryRun { // We were just asked to parse the data, not saving it
+ 		return
+ 	}
+ 	if *cleanup {
++		log.Println("Clean up unused rating plans and rating profiles")
+ 		if err := tpReader.CleanDataDb(*tpid); err != nil {
+ 			log.Fatal("Error cleaning up unused rating plans/profiles")
+ 			return
+-		} else {
+-			*flush = true // Cleanup requires flushing cache
+-			log.Println("Cleanup ended succesfully")
+ 		}
+ 	}
+ 	if *ralsAddress != "" { // Init connection to rater so we can reload it's data
+@@ -241,6 +239,7 @@ func main() {
+ 	}
+ 	if !*remove {
+ 		// write maps to database
++		log.Println("Write data to Redis")
+ 		if err := tpReader.WriteToDatabase(*flush, *verbose, *disable_reverse); err != nil {
+ 			log.Fatal("Could not write to database: ", err)
+ 		}
+@@ -279,9 +278,9 @@ func main() {
+ 
+ 			// Reload cache first since actions could be calling info from within
+ 			if *flush {
+-				log.Print("Flushing cache")
++				log.Print("Flush cache")
+ 			} else {
+-				log.Print("Reloading cache")
++				log.Print("Reload cache")
+ 			}
+ 			if err = rater.Call("ApierV1.ReloadCache", utils.AttrReloadCache{ArgsCache: utils.ArgsCache{
+ 				DestinationIDs:        &dstIds,
+@@ -305,9 +304,7 @@ func main() {
+ 			}
+ 
+ 			if len(aps) != 0 {
+-				if *verbose {
+-					log.Print("Reloading scheduler")
+-				}
++				log.Print("Reload scheduler")
+ 				if err = rater.Call("ApierV1.ReloadScheduler", "", &reply); err != nil {
+ 					log.Printf("WARNING: Got error on scheduler reload: %s\n", err.Error())
+ 				}
+@@ -319,10 +316,8 @@ func main() {
+ 				statsQueueIds = []string{} // Force reload all
+ 			}
+ 			if len(statsQueueIds) != 0 {
+-				if *verbose {
+-					log.Print("Reloading CDRStats data")
+-				}
+ 				var reply string
++				log.Print("Reload CDRStats data")
+ 				if err := cdrstats.Call("CDRStatsV1.ReloadQueues", utils.AttrCDRStatsReloadQueues{StatsQueueIds: statsQueueIds}, &reply); err != nil {
+ 					log.Printf("WARNING: Failed reloading stat queues, error: %s\n", err.Error())
+ 				}
+@@ -331,14 +326,11 @@ func main() {
+ 
+ 		if users != nil {
+ 			if len(userIds) > 0 {
+-				if *verbose {
+-					log.Print("Reloading Users data")
+-				}
+ 				var reply string
++				log.Print("Reload Users data")
+ 				if err := cdrstats.Call("UsersV1.ReloadUsers", "", &reply); err != nil {
+ 					log.Printf("WARNING: Failed reloading users data, error: %s\n", err.Error())
+ 				}
+-
+ 			}
+ 		}
+ 	} else {
+@@ -346,4 +338,5 @@ func main() {
+ 			log.Fatal("Could not delete from database: ", err)
+ 		}
+ 	}
++	log.Printf("Loaded all data from database for %q\n", *tpid)
+ }
+diff --git a/engine/tp_reader.go b/engine/tp_reader.go
+index bdf967fe7..81af07b80 100755
+--- a/engine/tp_reader.go
++++ b/engine/tp_reader.go
+@@ -544,6 +544,10 @@ func (tpr *TpReader) CleanDataDb(tpid string) (err error) {
+ 		return err
+ 	}
+ 
++	for _, key := range deleteItems {
++		cache.RemKey(key, true, utils.NonTransactional)
++	}
++
+ 	return nil
+ }
+ 
+@@ -2491,9 +2495,7 @@ func (tpr *TpReader) WriteToDatabase(flush, verbose, disable_reverse bool) (err
+ 	}
+ 	if !disable_reverse {
+ 		if len(tpr.destinations) > 0 {
+-			if verbose {
+-				log.Print("Rebuilding reverse destinations")
+-			}
++			log.Print("Rebuild reverse destinations")
+ 			if err = tpr.dm.DataDB().RebuildReverseForPrefix(utils.REVERSE_DESTINATION_PREFIX); err != nil {
+ 				return err
+ 			}
