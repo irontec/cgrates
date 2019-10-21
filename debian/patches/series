@@ -24,3 +24,4 @@
 024_sentinel_reconnect.patch
 025_derived_chargers.patch
 026_avoid_cache_flush.patch
+027_cgr_loader_defaults.patch
