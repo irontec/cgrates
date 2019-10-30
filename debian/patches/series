@@ -25,3 +25,5 @@
 025_derived_chargers.patch
 026_avoid_cache_flush.patch
 027_cgr_loader_defaults.patch
+028_reset_counters.patch
+029_do_not_override_acc_values.patch

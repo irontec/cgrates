@@ -1,0 +1,21 @@
+diff --git a/engine/storage_redis.go b/engine/storage_redis.go
+index d3b334297..6e534466b 100755
+--- a/engine/storage_redis.go
++++ b/engine/storage_redis.go
+@@ -714,10 +714,13 @@ func (rs *RedisStorage) SetAccount(ub *Account) (err error) {
+ 	// sense to write empty balance map
+ 	if len(ub.BalanceMap) == 0 {
+ 		if ac, err := rs.GetAccount(ub.ID); err == nil && !ac.allBalancesExpired() {
+-			ac.ActionTriggers = ub.ActionTriggers
+-			ac.UnitCounters = ub.UnitCounters
++			if len(ac.ActionTriggers) == 0 {
++				ac.ActionTriggers = ub.ActionTriggers
++			}
++			if len(ub.UnitCounters) == 0 {
++				ac.UnitCounters = ub.UnitCounters
++			}
+ 			ac.AllowNegative = ub.AllowNegative
+-			ac.Disabled = ub.Disabled
+ 			ub = ac
+ 		}
+ 	}
