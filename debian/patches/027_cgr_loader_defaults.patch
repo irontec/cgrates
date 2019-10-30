@@ -1,0 +1,33 @@
+diff --git a/cmd/cgr-loader/cgr-loader.go b/cmd/cgr-loader/cgr-loader.go
+index c7074fd6b..7305aa881 100755
+--- a/cmd/cgr-loader/cgr-loader.go
++++ b/cmd/cgr-loader/cgr-loader.go
+@@ -63,8 +63,8 @@ var (
+ 	toStorDb        = flag.Bool("to_stordb", false, "Import the tariff plan from files to storDb")
+ 	rpcEncoding     = flag.String("rpc_encoding", "json", "RPC encoding used <gob|json>")
+ 	ralsAddress     = flag.String("rals", "trunks.ivozprovider.local:2012", "Rater service to contact for cache reloads, empty to disable automatic cache reloads")
+-	cdrstatsAddress = flag.String("cdrstats", "trunks.ivozprovider.local:2012", "CDRStats service to contact for data reloads, empty to disable automatic data reloads")
+-	usersAddress    = flag.String("users", "trunks.ivozprovider.local:2012", "Users service to contact for data reloads, empty to disable automatic data reloads")
++	cdrstatsAddress = flag.String("cdrstats", "", "CDRStats service to contact for data reloads, empty to disable automatic data reloads")
++	usersAddress    = flag.String("users", "", "Users service to contact for data reloads, empty to disable automatic data reloads")
+ 	runId           = flag.String("runid", "", "Uniquely identify an import/load, postpended to some automatic fields")
+ 	loadHistorySize = flag.Int("load_history_size", config.CgrConfig().LoadHistorySize, "Limit the number of records in the load history")
+ 	timezone        = flag.String("timezone", "UTC", `Timezone for timestamps where not specified <""|UTC|Local|$IANA_TZ_DB>`)
+@@ -221,8 +221,6 @@ func main() {
+ 				return
+ 			}
+ 		}
+-	} else {
+-		log.Print("WARNING: CDRStats automatic data reload is disabled!")
+ 	}
+ 	if *usersAddress != "" { // Init connection to rater so we can reload it's data
+ 		if *usersAddress == *ralsAddress {
+@@ -234,8 +232,6 @@ func main() {
+ 				return
+ 			}
+ 		}
+-	} else {
+-		log.Print("WARNING: Users automatic data reload is disabled!")
+ 	}
+ 	if !*remove {
+ 		// write maps to database

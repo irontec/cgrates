@@ -1,0 +1,107 @@
+diff --git a/apier/v1/triggers.go b/apier/v1/triggers.go
+index 1ccfeb5cc..0213e4f97 100644
+--- a/apier/v1/triggers.go
++++ b/apier/v1/triggers.go
+@@ -157,6 +157,7 @@ type AttrResetAccountActionTriggers struct {
+ 	GroupID  string
+ 	UniqueID string
+ 	Executed bool
++	ResetCounters bool
+ }
+ 
+ func (self *ApierV1) ResetAccountActionTriggers(attr AttrResetAccountActionTriggers, reply *string) error {
+@@ -178,8 +179,12 @@ func (self *ApierV1) ResetAccountActionTriggers(attr AttrResetAccountActionTrigg
+ 				// reset action trigger
+ 				at.Executed = attr.Executed
+ 			}
++		}
+ 
++		if attr.ResetCounters {
++			account.UnitCounters.ResetCounters(nil)
+ 		}
++
+ 		if attr.Executed == false {
+ 			account.ExecuteActionTriggers(nil)
+ 		}
+diff --git a/console/account_trigger_reset.go b/console/account_trigger_reset.go
+index 61c3621c6..0523c9c25 100644
+--- a/console/account_trigger_reset.go
++++ b/console/account_trigger_reset.go
+@@ -24,7 +24,7 @@ func init() {
+ 	c := &CmdAccountResetTriggers{
+ 		name:      "account_triggers_reset",
+ 		rpcMethod: "ApierV1.ResetAccountActionTriggers",
+-		rpcParams: &v1.AttrRemoveAccountActionTriggers{},
++		rpcParams: &v1.AttrResetAccountActionTriggers{},
+ 	}
+ 	commands[c.Name()] = c
+ 	c.CommandExecuter = &CommandExecuter{c}
+@@ -34,7 +34,7 @@ func init() {
+ type CmdAccountResetTriggers struct {
+ 	name      string
+ 	rpcMethod string
+-	rpcParams *v1.AttrRemoveAccountActionTriggers
++	rpcParams *v1.AttrResetAccountActionTriggers
+ 	*CommandExecuter
+ }
+ 
+@@ -48,7 +48,7 @@ func (self *CmdAccountResetTriggers) RpcMethod() string {
+ 
+ func (self *CmdAccountResetTriggers) RpcParams(reset bool) interface{} {
+ 	if reset || self.rpcParams == nil {
+-		self.rpcParams = &v1.AttrRemoveAccountActionTriggers{}
++		self.rpcParams = &v1.AttrResetAccountActionTriggers{}
+ 	}
+ 	return self.rpcParams
+ }
+diff --git a/engine/action.go b/engine/action.go
+index b554184fa..7e54f4187 100644
+--- a/engine/action.go
++++ b/engine/action.go
+@@ -349,7 +349,7 @@ func resetCountersAction(ub *Account, sq *CDRStatsQueueTriggered, a *Action, acs
+ 		return errors.New("nil account")
+ 	}
+ 	if ub.UnitCounters != nil {
+-		ub.UnitCounters.resetCounters(a)
++		ub.UnitCounters.ResetCounters(a)
+ 	}
+ 	return
+ }
+diff --git a/engine/units_counter.go b/engine/units_counter.go
+index fe960fb00..79a12f086 100644
+--- a/engine/units_counter.go
++++ b/engine/units_counter.go
+@@ -88,7 +88,7 @@ func (ucs UnitCounters) addUnits(amount float64, kind string, cc *CallCost, b *B
+ 	}
+ }
+ 
+-func (ucs UnitCounters) resetCounters(a *Action) {
++func (ucs UnitCounters) ResetCounters(a *Action) {
+ 	for key, counters := range ucs {
+ 		if a != nil && a.Balance.Type != nil && a.Balance.GetType() != key {
+ 			continue
+diff --git a/engine/units_counter_test.go b/engine/units_counter_test.go
+index 4ee1d3104..0e37cf52b 100644
+--- a/engine/units_counter_test.go
++++ b/engine/units_counter_test.go
+@@ -472,7 +472,7 @@ func TestUnitCountersResetCounterById(t *testing.T) {
+ 		}
+ 		t.Errorf("Error Initializing adding unit counters: %v", len(a.UnitCounters))
+ 	}
+-	a.UnitCounters.resetCounters(&Action{
++	a.UnitCounters.ResetCounters(&Action{
+ 		Balance: &BalanceFilter{
+ 			Type: utils.StringPointer(utils.MONETARY),
+ 			ID:   utils.StringPointer("TestTR11"),
+diff --git a/general_tests/tp_it_test.go b/general_tests/tp_it_test.go
+index 559a2ecba..7198ce391 100644
+--- a/general_tests/tp_it_test.go
++++ b/general_tests/tp_it_test.go
+@@ -389,6 +389,7 @@ func TestTpApierResetAccountActionTriggers(t *testing.T) {
+ 		Account:  "1005",
+ 		GroupID:  "STANDARD_TRIGGERS",
+ 		Executed: true,
++		ResetCounters: false,
+ 	}, &reply); err != nil {
+ 		t.Error("Error on ApierV2.ResetAccountActionTriggers: ", err.Error())
+ 	} else if reply != utils.OK {
