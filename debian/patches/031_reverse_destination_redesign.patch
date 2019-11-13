@@ -1,0 +1,201 @@
+unchanged:
+--- b/engine/tp_reader.go
++++ b/engine/tp_reader.go
+@@ -2078,34 +2078,47 @@
+ 	return valid
+ }
+ 
+-func (tpr *TpReader) WriteToDatabase(flush, verbose, disable_reverse bool) (err error) {
++func (tpr *TpReader) WriteToDatabase(flush, verbose, disable_reverse, disable_destinations bool) (err error) {
+ 	if tpr.dm.dataDB == nil {
+ 		return errors.New("no database connection")
+ 	}
+ 	if flush { // ToDo
+ 		//tpr.dm.DataDB().Flush("")
+ 	}
+-	if verbose {
+-		log.Print("Destinations:")
++	if disable_destinations {
++		log.Println("Destinations: skip")
++		log.Println("Reverse Destinations: skip")
+ 	} else {
+-		log.Println("Destinations:", len(tpr.destinations))
+-	}
+-	for _, d := range tpr.destinations {
+-		err = tpr.dm.DataDB().SetDestination(d, utils.NonTransactional)
+-		if err != nil {
+-			return err
+-		}
+ 		if verbose {
+-			log.Print("\t", d.Id, " : ", d.Prefixes)
++			log.Print("Destinations:")
++		} else {
++			log.Println("Destinations:", len(tpr.destinations))
+ 		}
+-	}
+-	if verbose {
+-		log.Print("Reverse Destinations:")
+-		for id, vals := range tpr.revDests {
+-			log.Printf("\t %s : %+v", id, vals)
++		for _, d := range tpr.destinations {
++			err = tpr.dm.DataDB().SetDestination(d, utils.NonTransactional)
++			if err != nil {
++				return err
++			}
++			if verbose {
++				log.Print("\t", d.Id, " : ", d.Prefixes)
++				log.Print("Reverse Destinations:")
++				for id, vals := range tpr.revDests {
++					log.Printf("\t %s : %+v", id, vals)
++				}
++			} else {
++				log.Println("Reverse Destinations:", len(tpr.revDests))
++			}
++			err = tpr.dm.DataDB().SetReverseDestination(d, utils.NonTransactional)
++			if err != nil {
++				return err
++			}
++			if verbose {
++				log.Print("Reverse Destinations:")
++				for id, vals := range tpr.revDests {
++					log.Printf("\t %s : %+v", id, vals)
++				}
++			}
+ 		}
+-	} else {
+-		log.Println("Reverse Destinations:", len(tpr.revDests))
+ 	}
+ 	if verbose {
+ 		log.Print("Rating Plans:")
+@@ -2489,12 +2502,6 @@
+ 		}
+ 	}
+ 	if !disable_reverse {
+-		if len(tpr.destinations) > 0 {
+-			log.Print("Rebuild reverse destinations")
+-			if err = tpr.dm.DataDB().RebuildReverseForPrefix(utils.REVERSE_DESTINATION_PREFIX); err != nil {
+-				return err
+-			}
+-		}
+ 		if len(tpr.acntActionPlans) > 0 {
+ 			if verbose {
+ 				log.Print("Rebuilding account action plans")
+unchanged:
+--- a/apier/v1/apier.go
++++ b/apier/v1/apier.go
+@@ -335,6 +335,7 @@ type AttrLoadTpFromStorDb struct {
+ 	DryRun   bool // Only simulate, no write
+ 	Validate bool // Run structural checks
+ 	Cleanup  bool // Clean up unused rpl_ and rpf_
++	DisableDestinations bool // No destination changes
+ }
+ 
+ // Loads complete data in a TP from storDb
+@@ -371,7 +372,7 @@ func (self *ApierV1) LoadTariffPlanFromStorDb(attrs AttrLoadTpFromStorDb, reply
+ 	}
+ 
+ 	utils.Logger.Info("ApierV1.LoadTariffPlanFromStorDb, write data to Redis")
+-	if err := dbReader.WriteToDatabase(attrs.FlushDb, false, false); err != nil {
++	if err := dbReader.WriteToDatabase(attrs.FlushDb, false, false, attrs.DisableDestinations); err != nil {
+ 		utils.Logger.Err(err.Error())
+ 		return utils.NewErrServerError(err)
+ 	}
+@@ -1909,7 +1910,7 @@ func (self *ApierV1) LoadTariffPlanFromFolder(attrs utils.AttrLoadTpFromFolder,
+ 		}
+ 	}
+ 
+-	if err := loader.WriteToDatabase(attrs.FlushDb, false, false); err != nil {
++	if err := loader.WriteToDatabase(attrs.FlushDb, false, false, false); err != nil {
+ 		return utils.NewErrServerError(err)
+ 	}
+ 	utils.Logger.Info("ApierV1.LoadTariffPlanFromFolder, reloading cache.")
+unchanged:
+--- a/apier/v2/apier.go
++++ b/apier/v2/apier.go
+@@ -159,7 +159,7 @@ func (self *ApierV2) LoadTariffPlanFromFolder(attrs utils.AttrLoadTpFromFolder,
+ 		}
+ 	}
+ 
+-	if err := loader.WriteToDatabase(attrs.FlushDb, false, false); err != nil {
++	if err := loader.WriteToDatabase(attrs.FlushDb, false, false, false); err != nil {
+ 		return utils.NewErrServerError(err)
+ 	}
+ 
+unchanged:
+--- a/cmd/cgr-loader/cgr-loader.go
++++ b/cmd/cgr-loader/cgr-loader.go
+@@ -68,7 +68,8 @@ var (
+ 	runId           = flag.String("runid", "", "Uniquely identify an import/load, postpended to some automatic fields")
+ 	loadHistorySize = flag.Int("load_history_size", config.CgrConfig().LoadHistorySize, "Limit the number of records in the load history")
+ 	timezone        = flag.String("timezone", "UTC", `Timezone for timestamps where not specified <""|UTC|Local|$IANA_TZ_DB>`)
+-	disable_reverse = flag.Bool("disable_reverse_mappings", false, "Will disable reverse mappings rebuilding")
++	disable_reverse = flag.Bool("disable_reverse_mappings", false, "Will disable reverse mappings rebuilding (except reverse destinations, see disable_destinations)")
++	disable_destinations = flag.Bool("disable_destinations", false, "Will disable destinations and reverse destinations mappings rebuilding")
+ 	remove          = flag.Bool("remove", false, "Will remove any data from db that matches data files")
+ 	cleanup         = flag.Bool("cleanup", false, "Remove unreferenced rating plans and rating profiles")
+ )
+@@ -236,7 +237,7 @@ func main() {
+ 	if !*remove {
+ 		// write maps to database
+ 		log.Println("Write data to Redis")
+-		if err := tpReader.WriteToDatabase(*flush, *verbose, *disable_reverse); err != nil {
++		if err := tpReader.WriteToDatabase(*flush, *verbose, *disable_reverse, *disable_destinations); err != nil {
+ 			log.Fatal("Could not write to database: ", err)
+ 		}
+ 		var dstIds, revDstIDs, rplIds, rpfIds, actIds, aapIDs, shgIds, alsIds, lcrIds, dcsIds, rspIDs, resIDs, aatIDs, ralsIDs []string
+unchanged:
+--- a/engine/libtest.go
++++ b/engine/libtest.go
+@@ -142,7 +142,7 @@ func LoadTariffPlanFromFolder(tpPath, timezone string, dm *DataManager, disable_
+ 	if err := loader.LoadAll(); err != nil {
+ 		return utils.NewErrServerError(err)
+ 	}
+-	if err := loader.WriteToDatabase(false, false, disable_reverse); err != nil {
++	if err := loader.WriteToDatabase(false, false, disable_reverse, false); err != nil {
+ 		return utils.NewErrServerError(err)
+ 	}
+ 	return nil
+only in patch2:
+unchanged:
+--- a/engine/tp_reader.go
++++ b/engine/tp_reader.go
+@@ -2090,7 +2090,7 @@ func (tpr *TpReader) WriteToDatabase(flush, verbose, disable_reverse, disable_de
+ 		log.Println("Reverse Destinations: skip")
+ 	} else {
+ 		if verbose {
+-			log.Print("Destinations:")
++			log.Println("Destinations:")
+ 		} else {
+ 			log.Println("Destinations:", len(tpr.destinations))
+ 		}
+@@ -2101,23 +2101,19 @@ func (tpr *TpReader) WriteToDatabase(flush, verbose, disable_reverse, disable_de
+ 			}
+ 			if verbose {
+ 				log.Print("\t", d.Id, " : ", d.Prefixes)
+-				log.Print("Reverse Destinations:")
+-				for id, vals := range tpr.revDests {
+-					log.Printf("\t %s : %+v", id, vals)
+-				}
+-			} else {
+-				log.Println("Reverse Destinations:", len(tpr.revDests))
+ 			}
+ 			err = tpr.dm.DataDB().SetReverseDestination(d, utils.NonTransactional)
+ 			if err != nil {
+ 				return err
+ 			}
+-			if verbose {
+-				log.Print("Reverse Destinations:")
+-				for id, vals := range tpr.revDests {
+-					log.Printf("\t %s : %+v", id, vals)
+-				}
++		}
++		if verbose {
++			log.Print("Reverse Destinations:")
++			for id, vals := range tpr.revDests {
++				log.Printf("\t %s : %+v", id, vals)
+ 			}
++		} else {
++			log.Println("Reverse Destinations:", len(tpr.revDests))
+ 		}
+ 	}
+ 	if verbose {

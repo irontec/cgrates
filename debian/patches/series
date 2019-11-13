@@ -11,7 +11,6 @@
 010_fix_ratingprofile_set.patch
 012_retarification_logic.patch
 013_asr_for_failed_calls.patch
-014_smart_destination_write.patch
 015_mandatory_tpid.patch
 016_increase_loader_log.patch
 017_skip_incomplete_lcr_rules.patch
@@ -28,3 +27,4 @@
 028_reset_counters.patch
 029_do_not_override_acc_values.patch
 030_ignore_allowNegative_onCgrAuth.patch
+031_reverse_destination_redesign.patch
