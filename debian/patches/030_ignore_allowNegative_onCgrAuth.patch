@@ -1,0 +1,14 @@
+diff --git a/engine/calldesc.go b/engine/calldesc.go
+index c1ad3cc17..7ab8d3cc9 100755
+--- a/engine/calldesc.go
++++ b/engine/calldesc.go
+@@ -633,9 +633,6 @@ func (origCD *CallDescriptor) getMaxSessionDuration(origAcc *Account) (time.Dura
+ 	// clone the account for discarding chenges on debit dry run
+ 	//log.Printf("ORIG CD: %+v", origCD)
+ 	account := origAcc.Clone()
+-	if account.AllowNegative {
+-		return -1, nil
+-	}
+ 	// for zero duration index
+ 	if origCD.DurationIndex < origCD.TimeEnd.Sub(origCD.TimeStart) {
+ 		origCD.DurationIndex = origCD.TimeEnd.Sub(origCD.TimeStart)
