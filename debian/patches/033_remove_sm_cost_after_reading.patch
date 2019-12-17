@@ -1,0 +1,15 @@
+diff --git a/engine/cdrs.go b/engine/cdrs.go
+index 1b4e8f4f8..8dd28811e 100644
+--- a/engine/cdrs.go
++++ b/engine/cdrs.go
+@@ -445,6 +445,10 @@ func (self *CdrServer) rateCDR(cdr *CDR) ([]*CDR, error) {
+ 				cdrClone.CostDetails = smCost.CostDetails
+ 				cdrClone.CostSource = smCost.CostSource
+ 				cdrsRated = append(cdrsRated, cdrClone)
++				if err := self.cdrDb.RemoveSMCost(smCost); err != nil {
++					utils.Logger.Warning(
++						fmt.Sprintf("<Cdrs> WARNING: Could not remove sm_cost entry for cgrid: %s", cdr.CGRID))
++				}
+ 			}
+ 			return cdrsRated, nil
+ 		} else { //calculate CDR as for pseudoprepaid
