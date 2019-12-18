@@ -126,8 +126,8 @@ imports:
   - transform
 - name: github.com/fsnotify/fsnotify
   version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
-- name: github.com/cgrates/mgo
-  version: 8c7a1328d9b01236687f383e686a9c610441ddc7
+- name: github.com/irontec/mgo
+  version: e611368f72b113f02edb83140e1c7bf533023c0d
   subpackages:
   - bson
   - internal/json

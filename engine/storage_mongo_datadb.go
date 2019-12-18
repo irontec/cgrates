@@ -30,8 +30,8 @@ import (
 	"github.com/cgrates/cgrates/config"
 	"github.com/cgrates/cgrates/guardian"
 	"github.com/cgrates/cgrates/utils"
-	"github.com/cgrates/mgo"
-	"github.com/cgrates/mgo/bson"
+	"github.com/irontec/mgo"
+	"github.com/irontec/mgo/bson"
 )
 
 const (
