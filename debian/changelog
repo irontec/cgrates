@@ -1,8 +1,14 @@
-ivozprovider-cgrates (2.13~0.9.1) UNRELEASED; urgency=medium
+ivozprovider-cgrates (2.14~0.9.1) UNRELEASED; urgency=medium
+
+  * Version bump to 2.14.0
+
+ -- Irontec IvozProvider Team <ivozprovider@irontec.com>  Wed, 18 Dec 2019 13:32:30 +0100
+
+ivozprovider-cgrates (2.13~0.9.1) unstable; urgency=medium
 
   * Version bump to 2.13.0
 
- -- Irontec IvozProvider Team <ivozprovider@irontec.com>  Wed, 09 Oct 2019 13:08:34 +0200
+ -- Irontec IvozProvider Team <ivozprovider@irontec.com>  Wed, 18 Dec 2019 13:31:57 +0100
 
 ivozprovider-cgrates (2.12~0.9.1) unstable; urgency=medium
 
