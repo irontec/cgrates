@@ -2,7 +2,7 @@ Source: ivozprovider-cgrates
 Section: net
 Priority: optional
 Maintainer: Irontec IvozProvider Team <ivozprovider@irontec.com>
-Build-Depends: debhelper, quilt, git, golang-1.8, ca-certificates
+Build-Depends: debhelper, quilt, git, golang-1.11, golang-go, ca-certificates
 Standards-Version: 3.9.1
 Homepage: http://cgrates.org
 
