@@ -1,0 +1,15 @@
+diff --git a/engine/action.go b/engine/action.go
+index b554184fa..7cacd8ac6 100644
+--- a/engine/action.go
++++ b/engine/action.go
+@@ -419,6 +419,10 @@ func callUrl(ub *Account, sq *CDRStatsQueueTriggered, a *Action, acs Actions) er
+ 	ffn := &utils.FallbackFileName{Module: fmt.Sprintf("%s>%s", utils.ActionsPoster, a.ActionType),
+ 		Transport: utils.MetaHTTPjson, Address: a.ExtraParameters,
+ 		RequestID: utils.GenUUID(), FileSuffix: utils.JSNSuffix}
++    if strings.Contains(a.ExtraParameters, "endCompanyCalls") {
++        a.ExtraParameters += fmt.Sprintf("?account=%s", ub.ID) // Append account as URL param
++        fmt.Printf("End company calls calling URL %q\n", a.ExtraParameters)
++    }
+ 	_, err = utils.NewHTTPPoster(config.CgrConfig().HttpSkipTlsVerify,
+ 		config.CgrConfig().ReplyTimeout).Post(a.ExtraParameters, utils.CONTENT_JSON, jsn,
+ 		config.CgrConfig().PosterAttempts, path.Join(cfg.FailedPostsDir, ffn.AsString()))
