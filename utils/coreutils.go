@@ -22,7 +22,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -110,13 +110,14 @@ func FirstNonEmpty(vals ...string) string {
 	return EmptyString
 }
 
-// Sha1 generate the SHA1 hash from any string
+// Sha1 generates the SHA256 hash from any string and returns first 40 characters of resulting string
 func Sha1(attrs ...string) string {
-	hasher := sha1.New()
+	hasher := sha256.New()
 	for _, attr := range attrs {
 		hasher.Write([]byte(attr))
 	}
-	return fmt.Sprintf("%x", hasher.Sum(nil))
+	long := fmt.Sprintf("%x", hasher.Sum(nil))
+	return long[:40]
 }
 
 // helper function for uuid generation
