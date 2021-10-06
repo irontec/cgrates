@@ -756,7 +756,10 @@ func (rs *RedisStorage) SetAccountDrv(acc *Account) (err error) {
 	// sense to write empty balance map
 	if len(acc.BalanceMap) == 0 {
 		if ac, err := rs.GetAccountDrv(acc.ID); err == nil && !ac.allBalancesExpired() {
-			ac.ActionTriggers = acc.ActionTriggers
+			// Do not override existing ActionTriggers
+			if len(ac.ActionTriggers) == 0 {
+				ac.ActionTriggers = acc.ActionTriggers
+			}
 			// Do not override existing UnitCounters
 			if len(ac.UnitCounters) == 0 {
 				ac.UnitCounters = acc.UnitCounters
