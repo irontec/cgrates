@@ -765,7 +765,6 @@ func (rs *RedisStorage) SetAccountDrv(acc *Account) (err error) {
 				ac.UnitCounters = acc.UnitCounters
 			}
 			ac.AllowNegative = acc.AllowNegative
-			ac.Disabled = acc.Disabled
 			acc = ac
 		}
 	}
