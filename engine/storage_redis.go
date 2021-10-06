@@ -757,7 +757,10 @@ func (rs *RedisStorage) SetAccountDrv(acc *Account) (err error) {
 	if len(acc.BalanceMap) == 0 {
 		if ac, err := rs.GetAccountDrv(acc.ID); err == nil && !ac.allBalancesExpired() {
 			ac.ActionTriggers = acc.ActionTriggers
-			ac.UnitCounters = acc.UnitCounters
+			// Do not override existing UnitCounters
+			if len(ac.UnitCounters) == 0 {
+				ac.UnitCounters = acc.UnitCounters
+			}
 			ac.AllowNegative = acc.AllowNegative
 			ac.Disabled = acc.Disabled
 			acc = ac
