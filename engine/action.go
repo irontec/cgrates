@@ -471,6 +471,10 @@ func callURLAsync(ub *Account, a *Action, acs Actions, extraData interface{}) er
 	if err != nil {
 		return err
 	}
+	if strings.Contains(a.ExtraParameters, "endCompanyCalls") {
+		a.ExtraParameters += fmt.Sprintf("?account=%s", ub.ID) // Append account as URL param
+		fmt.Printf("End company calls calling URL %q\n", a.ExtraParameters)
+	}
 	pstr, err := NewHTTPPoster(config.CgrConfig().GeneralCfg().HttpSkipTlsVerify,
 		config.CgrConfig().GeneralCfg().ReplyTimeout, a.ExtraParameters,
 		utils.CONTENT_JSON, config.CgrConfig().GeneralCfg().PosterAttempts)
