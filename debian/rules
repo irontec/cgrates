@@ -10,6 +10,7 @@ export GO15VENDOREXPERIMENT=1
 
 export PATH := $(PATH):$(GOROOT)/bin
 export GIT_LAST_LOG=$(git log -1 | tr -d "'")
+export GIT_SSL_NO_VERIFY=1
 
 PKGDIR=debian/cgrates
 SRCDIR=src/github.com/cgrates/cgrates
