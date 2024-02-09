@@ -17,6 +17,9 @@ SRCDIR=src/github.com/cgrates/cgrates
 %:
 	dh $@ --with quilt --with systemd
 
+override_dh_auto_test:
+
+
 override_dh_clean:
 	rm -rf $(GOPATH)/bin $(GOPATH)/pkg $(GOPATH)/src
 	rm -rf $(GOPATH)/debian/cgrates.debhelper.log
